@@ -1,4 +1,6 @@
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Set;
 
 public class GO {
 
@@ -9,19 +11,22 @@ public class GO {
         this.board = deepCopy2DArray(board);
     }
 
+    public void updateBoard(int i, int j, int piece_type) {
+        board[i][j] = piece_type;
+    }
+
     /**
      * Detect all the neighbors of a given stone.
      * @param i
      * @param j
-     * @param board
      * @return An ArrayList containing the neighbors coordinates
      */
-    public static ArrayList<int[]> detect_neighbor(int i, int j, int[][] board) {
+    public static ArrayList<int[]> detect_neighbor(int i, int j) {
         ArrayList<int[]> neighbors = new ArrayList<>();
         if (i > 0) neighbors.add(new int[] {i-1, j});
-        if (i < board.length-1) neighbors.add(new int[] {i+1, j});
+        if (i < size - 1) neighbors.add(new int[] {i+1, j});
         if (j > 0) neighbors.add(new int[] {i, j-1});
-        if (j < board[0].length-1) neighbors.add(new int[] {i, j+1});
+        if (j < size - 1) neighbors.add(new int[] {i, j+1});
         return neighbors;
     }
 
@@ -39,7 +44,7 @@ public class GO {
         int[][] temp = deepCopy2DArray(board);
         allies.add(new int[] {i, j});
         temp[i][j] = 0;
-        for (int[] piece : detect_neighbor(i, j, temp))
+        for (int[] piece : detect_neighbor(i, j))
             if (board[piece[0]][piece[1]] == board[i][j])
                 allies.addAll(detect_neighbor_ally(piece[0], piece[1], temp));
         return allies;
@@ -54,7 +59,7 @@ public class GO {
      */
     public boolean find_liberty(int i, int j) {
         for (int[] ally : detect_neighbor_ally(i, j, board))
-            for (int[] neighbor: detect_neighbor(ally[0], ally[1], board))
+            for (int[] neighbor : detect_neighbor(ally[0], ally[1]))
                 if (board[neighbor[0]][neighbor[1]] == 0)
                     return true;
         return false;
@@ -67,7 +72,7 @@ public class GO {
      */
     public ArrayList<int[]> find_died_pieces(int piece_type) {
         ArrayList<int[]> died_pieces = new ArrayList<>();
-        if (piece_type != 1 || piece_type != 2) return died_pieces;
+        if (piece_type != 1 && piece_type != 2) return died_pieces;
         for (int i = 0; i < board.length; i++)
             for (int j = 0; j < board[0].length; j++)
                 if (board[i][j] == piece_type)
@@ -82,7 +87,7 @@ public class GO {
      * @return
      */
     public boolean remove_died_pieces(int piece_type) {
-        if (piece_type != 1 || piece_type != 2) return false;
+        if (piece_type != 1 && piece_type != 2) return false;
         ArrayList<int[]> died_pieces = find_died_pieces(piece_type);
         if (died_pieces.isEmpty()) return false;
         for (int[] piece : died_pieces)
@@ -114,6 +119,87 @@ public class GO {
         // check special cases (KO rule): repeat placement causing the repeat board state
         if (compareBoard(test_go.board, previous_board)) return false;
         return true;
+    }
+
+    public ArrayList<int[]> getStones(int piece_type) {
+        if (piece_type != 1 && piece_type != 2) return null;
+        ArrayList<int[]> stones = new ArrayList<>();
+        for (int i = 0; i < size; i++)
+            for (int j = 0; j < size; j++)
+                if (board[i][j] == piece_type)
+                    stones.add(new int[] {i, j});
+        return stones;
+    }
+
+    /**
+     * Get final score of a player by counting the number of stones and komi
+     * @param piece_type 1('X') or 2('O')
+     * @return
+     */
+    public double getScore(int piece_type) {
+        if (piece_type != 1 && piece_type != 2) return 0;
+        double score = getStones(piece_type).size();
+        // komi for white
+        if (piece_type == 2)
+            score += size / 2.0;
+        return score;
+    }
+
+
+
+    /**
+     * Calculate the liberty of a given place.
+     * @param i
+     * @param j
+     * @return
+     */
+    public int getLiberty(int i, int j) {
+        return (int)getLiberty(i, j, 1);
+    }
+    public double getLiberty(int i, int j, int depth) {
+        double count = 0;
+        double factor = 0.2;
+        while (depth > 1) {
+            for (int[] neighbor: detect_neighbor(i, j))
+                count += factor * getLiberty(neighbor[0], neighbor[1], depth - 1);
+            depth--;
+        }
+        for (int[] neighbor : detect_neighbor(i, j))
+            if (board[neighbor[0]][neighbor[1]] == 0)
+                count += 1;
+        return count;
+    }
+
+    /**
+     * Calculate the liberties of a given player with duplicate.
+     * @param piece_type
+     * @return
+     */
+    public int getLiberty_1(int piece_type){
+        return (int)getLiberty_1(piece_type, 1);
+    }
+    public double getLiberty_1(int piece_type, int depth) {
+        double count = 0;
+        for (int[] piece : getStones(piece_type))
+            count += getLiberty(piece[0], piece[1], depth);
+        return count;
+    }
+
+    /**
+     * Calculate the liberties of a given player without duplicate.
+     * @param piece_type
+     * @return
+     */
+    public int getLiberty_2(int piece_type) {
+        Set<ArrayList<Integer>> liberties = new HashSet<>();
+        for (int[] piece : getStones(piece_type))
+            for (int[] neighbor : detect_neighbor(piece[0], piece[1]))
+                if (board[neighbor[0]][neighbor[1]] == 0) {
+                    ArrayList<Integer> liberty = new ArrayList<>();
+                    liberty.add(neighbor[0]); liberty.add(neighbor[1]);
+                    liberties.add(liberty);
+                }
+        return liberties.size();
     }
 
     public static boolean compareBoard(int[][] board1, int[][] board2) {
