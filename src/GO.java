@@ -4,15 +4,41 @@ import java.util.Set;
 
 public class GO {
 
+    private int[][] previous_board;
     private int[][] board;
-    public static int size = 5;
+    private int[] freshStone;
 
-    public GO(int[][] board) {
+    public GO(int[][] previous_board, int[][] board) {
+        this.previous_board = deepCopy2DArray(previous_board);
         this.board = deepCopy2DArray(board);
     }
 
-    public void updateBoard(int i, int j, int piece_type) {
+    public GO(GO previous) {
+        this.previous_board = deepCopy2DArray(previous.board);
+        this.board = deepCopy2DArray(previous.board);
+    }
+
+    public boolean updateBoard(int i, int j, int piece_type) {
+        if (!valid_place_check(i, j, piece_type)) return false;
+        previous_board = deepCopy2DArray(board);
         board[i][j] = piece_type;
+        remove_died_pieces(3 - piece_type);
+        freshStone = new int[] {i, j, piece_type};
+        return true;
+    }
+
+    public int[] getFreshStone() {
+        if (freshStone == null) return null;
+        return freshStone;
+    }
+
+    public double getSafety(int i, int j, int piece_type) {
+        double safety = 0;
+        for (int[] neighbor : detect_neighbor(i, j)){
+            if (board[neighbor[0]][neighbor[1]] == 0) safety += 1;
+            if (board[neighbor[0]][neighbor[1]] == piece_type) safety += 0.5;
+        }
+        return safety;
     }
 
     /**
@@ -21,15 +47,18 @@ public class GO {
      * @param j
      * @return An ArrayList containing the neighbors coordinates
      */
-    public static ArrayList<int[]> detect_neighbor(int i, int j) {
+    public ArrayList<int[]> detect_neighbor(int i, int j) {
         ArrayList<int[]> neighbors = new ArrayList<>();
         if (i > 0) neighbors.add(new int[] {i-1, j});
-        if (i < size - 1) neighbors.add(new int[] {i+1, j});
+        if (i < board.length - 1) neighbors.add(new int[] {i+1, j});
         if (j > 0) neighbors.add(new int[] {i, j-1});
-        if (j < size - 1) neighbors.add(new int[] {i, j+1});
+        if (j < board[0].length - 1) neighbors.add(new int[] {i, j+1});
         return neighbors;
     }
 
+    public ArrayList<int[]> detect_neighbor_ally(int i, int j){
+        return detect_neighbor_ally(i, j, board);
+    }
     /**
      * Detect the neighbor allies of a given stone.
      * @param i
@@ -38,9 +67,9 @@ public class GO {
      * @return An ArrayList with all the allies of the given stone
      * PER: board[i][j] != 0
      */
-    public static ArrayList<int[]> detect_neighbor_ally(int i, int j, int[][] board) {
+    private ArrayList<int[]> detect_neighbor_ally(int i, int j, int[][] board) {
+        if (board[i][j] == 0) return null;
         ArrayList<int[]> allies = new ArrayList<>();
-        if (board[i][j] == 0) return allies;
         int[][] temp = deepCopy2DArray(board);
         allies.add(new int[] {i, j});
         temp[i][j] = 0;
@@ -71,8 +100,8 @@ public class GO {
      * @return An ArrayList containing the dead pieces row and column
      */
     public ArrayList<int[]> find_died_pieces(int piece_type) {
+        if (piece_type != 1 && piece_type != 2) return null;
         ArrayList<int[]> died_pieces = new ArrayList<>();
-        if (piece_type != 1 && piece_type != 2) return died_pieces;
         for (int i = 0; i < board.length; i++)
             for (int j = 0; j < board[0].length; j++)
                 if (board[i][j] == piece_type)
@@ -99,33 +128,39 @@ public class GO {
      * Check whether a placement is valid.
      * @param i
      * @param j
-     * @param piece_type 1('X') or 2('O')
      * @return boolean indicating whether the placement is valid.
      */
-    public boolean valid_place_check(int i, int j, int piece_type, int[][] previous_board) {
+    public boolean valid_place_check(int i, int j, int piece_type) {
         // check if the place is in the board range
-        if (i < 0 || i > size - 1) return false;
-        if (j < 0 || j > size - 1) return false;
+        if (i < 0 || i > board.length - 1) return false;
+        if (j < 0 || j > board[0].length - 1) return false;
         // check if the place already has a piece
         if (board[i][j] != 0) return false;
         // copy the board for testing
-        GO test_go = new GO(board);
+        GO test_go = new GO(board, board);
         // check if the place has liberty
         test_go.board[i][j] = piece_type;
         if (test_go.find_liberty(i, j)) return true;
         // if not, remove the died pieces of opponent and check again
         if (!test_go.remove_died_pieces(3 - piece_type)) return false;
-        assert test_go.find_liberty(i, j): "test_go.find_liberty(i, j) should return true";
         // check special cases (KO rule): repeat placement causing the repeat board state
-        if (compareBoard(test_go.board, previous_board)) return false;
-        return true;
+        return !compareBoard(test_go.board, previous_board);
+    }
+
+    public ArrayList<int[]> getPossiblePlacements(int piece_type) {
+        ArrayList<int[]> possible_placements = new ArrayList<>();
+        for (int i = 0; i < board.length; i++)
+            for (int j = 0; j < board[0].length; j++)
+                if (valid_place_check(i, j, piece_type))
+                    possible_placements.add(new int[]{i, j});
+        return possible_placements;
     }
 
     public ArrayList<int[]> getStones(int piece_type) {
         if (piece_type != 1 && piece_type != 2) return null;
         ArrayList<int[]> stones = new ArrayList<>();
-        for (int i = 0; i < size; i++)
-            for (int j = 0; j < size; j++)
+        for (int i = 0; i < board.length; i++)
+            for (int j = 0; j < board[0].length; j++)
                 if (board[i][j] == piece_type)
                     stones.add(new int[] {i, j});
         return stones;
@@ -141,11 +176,9 @@ public class GO {
         double score = getStones(piece_type).size();
         // komi for white
         if (piece_type == 2)
-            score += size / 2.0;
+            score += board.length / 2.0;
         return score;
     }
-
-
 
     /**
      * Calculate the liberty of a given place.
@@ -161,7 +194,8 @@ public class GO {
         double factor = 0.2;
         while (depth > 1) {
             for (int[] neighbor: detect_neighbor(i, j))
-                count += factor * getLiberty(neighbor[0], neighbor[1], depth - 1);
+                if (board[neighbor[0]][neighbor[1]] == 0)
+                    count += factor * getLiberty(neighbor[0], neighbor[1], depth - 1);
             depth--;
         }
         for (int[] neighbor : detect_neighbor(i, j))
@@ -175,10 +209,10 @@ public class GO {
      * @param piece_type
      * @return
      */
-    public int getLiberty_1(int piece_type){
-        return (int)getLiberty_1(piece_type, 1);
+    public int getLiberties(int piece_type){
+        return (int)getLiberties(piece_type, 1);
     }
-    public double getLiberty_1(int piece_type, int depth) {
+    public double getLiberties(int piece_type, int depth) {
         double count = 0;
         for (int[] piece : getStones(piece_type))
             count += getLiberty(piece[0], piece[1], depth);
@@ -212,6 +246,7 @@ public class GO {
     }
 
     public static int[][] deepCopy2DArray(int[][] target) {
+        if (target == null) return null;
         int[][] copy = new int[target.length][target[0].length];
         for(int i = 0; i < target.length; i++)
             for(int j = 0; j < target[0].length; j++)

@@ -1,66 +1,110 @@
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.PrintStream;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Scanner;
 
 public class my_player {
 
+    private static int size = 5;
+    private static int maxStep = size * size - 1;
     private static int piece_type;
-    public static int size = 5;
     private static int[][] previous_board = new int[size][size];
     private static int[][] board = new int[size][size];
+    private static int step;
     private static GO go;
 
     public static void main(String[] args) {
         try (Scanner in = new Scanner(new File("input.txt"))) {
             readInput(in);
-            go = new GO(board);
-
-//            for (int[] place : getPossiblePlacements()) {
-//                System.out.println(Arrays.toString(place) + " " + evaluation(place[0], place[1]));
-////                System.out.println(Arrays.toString(place) + " " + go.getLiberty(place[0], place[1], 3));
-//            }
-
-            writeOutput(greedy(getPossiblePlacements()), new PrintStream(new File("output.txt")));
+            go = new GO(previous_board, board);
+            writeOutput(minimax(go.getPossiblePlacements(piece_type)), new PrintStream(new File("output.txt")));
+//            writeOutput(greedy(go.getPossiblePlacements(piece_type)), new PrintStream(new File("output.txt")));
+            System.err.println(step);
         } catch (FileNotFoundException e) {
-            System.err.println("Warning: File \"input.txt\" does not exist!");
+            System.err.println(e.getMessage());
             System.err.println("The program exit.");
         }
     }
 
-    private static int[] minimax() {
+    private static int[] minimax(ArrayList<int[]> possible_placements) {
+        if (possible_placements.isEmpty()) return null;
+        double maxValue = Integer.MIN_VALUE;
+        Map<int[], Double> valueMap = new HashMap<>();
+        for (int[] place : possible_placements) {
+            GO test_go = new GO(go);
+            test_go.updateBoard(place[0], place[1], piece_type);
+            double curValue = minValue(test_go, 4, step, piece_type, Integer.MIN_VALUE, Integer.MAX_VALUE);
+            valueMap.put(place, curValue);
+            maxValue = curValue > maxValue ? curValue : maxValue;
+        }
+        for (int[] place : valueMap.keySet())
+            if (valueMap.get(place) == maxValue)
+                return place;
         return null;
     }
 
-    private static int[] greedy(ArrayList<int[]> possible_placements) {
-        double maxEvaluation = 0;
-        for (int[] place : possible_placements) {
-            double curEvalutation = evaluation(place[0], place[1]);
-            maxEvaluation = curEvalutation > maxEvaluation ? curEvalutation : maxEvaluation;
+    private static double maxValue(GO go, int depth, int step, int piece_type, double a, double b) {
+        if (depth < 1 || step > maxStep - 1) return evaluation(go);
+        double value = Integer.MIN_VALUE;
+        for (int[] place : go.getPossiblePlacements(3 - piece_type)) {
+            GO test_go = new GO(go);
+            test_go.updateBoard(place[0], place[1], 3 - piece_type);
+            double curValue = minValue(test_go, depth - 1, step + 1, 3 - piece_type, a, b);
+            value = curValue > value ? curValue : value;
+            if (value >= b) return value;
+            a = value > a ? value : a;
         }
-        ArrayList<int[]> prefer_placements = new ArrayList<>();
-        for (int[] place : possible_placements)
-            if (evaluation(place[0], place[1]) == maxEvaluation)
-                prefer_placements.add(new int[] {place[0], place[1]});
-        Random r = new Random();
-        return prefer_placements.get(r.nextInt(prefer_placements.size()));
+        return value;
     }
 
-    private static double evaluation(int i, int j) {
+    private static double minValue(GO go, int depth, int step, int piece_type, double a, double b) {
+        if (depth < 1 || step > maxStep - 1) return evaluation(go);
+        double value = Integer.MAX_VALUE;
+        for (int[] place : go.getPossiblePlacements(3 - piece_type)) {
+            GO test_go = new GO(go);
+            test_go.updateBoard(place[0], place[1], 3 - piece_type);
+            double curValue = maxValue(test_go, depth - 1, step + 1, 3 - piece_type, a, b);
+            value = curValue < value ? curValue : value;
+            if (value <= a) return value;
+            b = value < b ? value : b;
+        }
+        return value;
+    }
+
+    private static int[] greedy(ArrayList<int[]> possible_placements) {
+        if (possible_placements.isEmpty()) return null;
+        double maxEvaluation = Integer.MIN_VALUE;
+        Map<int[], Double> valueMap = new HashMap<>();
+        for (int[] place : possible_placements) {
+            GO test_go = new GO(board, board);
+            test_go.updateBoard(place[0], place[1], piece_type);
+            double curEvaluation = evaluation(test_go);
+            valueMap.put(place, curEvaluation);
+            maxEvaluation = curEvaluation > maxEvaluation ? curEvaluation : maxEvaluation;
+        }
+        for (int[] place : valueMap.keySet())
+            if (valueMap.get(place) == maxEvaluation)
+                return place;
+        return null;
+    }
+
+    private static double evaluation(GO test_go) {
+        int[] freshStone = test_go.getFreshStone();
+        double safety = 0;
+        if (piece_type == freshStone[2])
+            test_go.getSafety(freshStone[0], freshStone[1], freshStone[2]);
         int oppo_type = 3 - piece_type;
-        GO test_go = new GO(board);
-        test_go.updateBoard(i, j, piece_type);
-        test_go.remove_died_pieces(oppo_type);
-        double my_liberty_delta = test_go.getLiberty_2(piece_type) - go.getLiberty_2(piece_type);
-        double oppo_liberty_delta = test_go.getLiberty_2(oppo_type) - go.getLiberty_2(oppo_type);
-        int kill = (int)(go.getScore(3 - piece_type) - test_go.getScore(3 - piece_type));
-        double kill_facor = 0.5;
-        if (kill > 1) kill_facor = 1;
-        if (kill > 2) kill_facor = 10;
-        return kill * kill_facor + my_liberty_delta - oppo_liberty_delta;
+        double my_liberty = test_go.getLiberties(piece_type, 2);
+        double oppo_liberty = test_go.getLiberties(oppo_type, 2);
+        double my_stones = test_go.getStones(piece_type).size();
+        double oppo_stones = test_go.getStones(oppo_type).size();
+        return safety * 10 + my_liberty - oppo_liberty + (my_stones - oppo_stones) * 50;
     }
 
-    private static void readInput(Scanner in) {
+    private static void readInput(Scanner in) throws FileNotFoundException{
         piece_type = Integer.parseInt(in.nextLine());
         for (int i = 0; i < size; i++) {
             String line = in.nextLine();
@@ -72,6 +116,21 @@ public class my_player {
             for (int j = 0; j < size; j++)
                 board[i][j] = Integer.parseInt(line.substring(j, j+1));
         }
+        step = getStep();
+    }
+
+    private static int getStep() throws FileNotFoundException {
+        GO previous = new GO(previous_board, previous_board);
+        if (previous.getStones(piece_type).size() == 0 && previous.getStones(3 - piece_type).size() == 0) {
+            PrintStream stepOut = new PrintStream(new File("step.txt"));
+            stepOut.println(piece_type + 2);
+            return piece_type;
+        }
+        Scanner stepIn = new Scanner(new File("step.txt"));
+        int step = stepIn.nextInt();
+        PrintStream stepOut = new PrintStream(new File("step.txt"));
+        stepOut.println(step + 2);
+        return step;
     }
 
     private static void writeOutput(int[] result, PrintStream out) {
@@ -81,14 +140,4 @@ public class my_player {
         }
         out.println(result[0] + "," + result[1]);
     }
-
-    private static ArrayList<int[]> getPossiblePlacements() {
-        ArrayList<int[]> possible_placements = new ArrayList<>();
-        for (int i = 0; i < size; i++)
-            for (int j = 0; j < size; j++)
-                if (go.valid_place_check(i, j, piece_type, previous_board))
-                    possible_placements.add(new int[] {i, j});
-        return possible_placements;
-    }
-
 }
