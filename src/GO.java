@@ -1,6 +1,4 @@
 import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.Set;
 
 public class GO {
 
@@ -13,18 +11,13 @@ public class GO {
         this.board = deepCopy2DArray(board);
     }
 
-    public GO(GO previous) {
-        this.previous_board = deepCopy2DArray(previous.board);
+    // PRE: valid_place_check(i, j, piece_type) must be true.
+    public GO(GO previous, int i, int j, int piece_type) {
         this.board = deepCopy2DArray(previous.board);
-    }
-
-    public boolean updateBoard(int i, int j, int piece_type) {
-        if (!valid_place_check(i, j, piece_type)) return false;
-        previous_board = deepCopy2DArray(board);
+        this.previous_board = deepCopy2DArray(board);
         board[i][j] = piece_type;
         remove_died_pieces(3 - piece_type);
         freshStone = new int[] {i, j, piece_type};
-        return true;
     }
 
     public int[] getFreshStone() {
@@ -43,8 +36,6 @@ public class GO {
 
     /**
      * Detect all the neighbors of a given stone.
-     * @param i
-     * @param j
      * @return An ArrayList containing the neighbors coordinates
      */
     public ArrayList<int[]> detect_neighbor(int i, int j) {
@@ -56,17 +47,14 @@ public class GO {
         return neighbors;
     }
 
-    public ArrayList<int[]> detect_neighbor_ally(int i, int j){
-        return detect_neighbor_ally(i, j, board);
-    }
     /**
      * Detect the neighbor allies of a given stone.
-     * @param i
-     * @param j
-     * @param board
      * @return An ArrayList with all the allies of the given stone
      * PER: board[i][j] != 0
      */
+    public ArrayList<int[]> detect_neighbor_ally(int i, int j){
+        return detect_neighbor_ally(i, j, board);
+    }
     private ArrayList<int[]> detect_neighbor_ally(int i, int j, int[][] board) {
         if (board[i][j] == 0) return null;
         ArrayList<int[]> allies = new ArrayList<>();
@@ -81,13 +69,11 @@ public class GO {
 
     /**
      * Find liberty of a given stone. If a group of allied stones has no liberty, they all die.
-     * @param i
-     * @param j
      * @return boolean indicating whether the given stone still has liberty
      * PER: board[i][j] != 0
      */
     public boolean find_liberty(int i, int j) {
-        for (int[] ally : detect_neighbor_ally(i, j, board))
+        for (int[] ally : detect_neighbor_ally(i, j))
             for (int[] neighbor : detect_neighbor(ally[0], ally[1]))
                 if (board[neighbor[0]][neighbor[1]] == 0)
                     return true;
@@ -100,7 +86,6 @@ public class GO {
      * @return An ArrayList containing the dead pieces row and column
      */
     public ArrayList<int[]> find_died_pieces(int piece_type) {
-        if (piece_type != 1 && piece_type != 2) return null;
         ArrayList<int[]> died_pieces = new ArrayList<>();
         for (int i = 0; i < board.length; i++)
             for (int j = 0; j < board[0].length; j++)
@@ -113,10 +98,8 @@ public class GO {
     /**
      * Remove the dead stones in the board.
      * @param piece_type 1('X') or 2('O')
-     * @return
      */
     public boolean remove_died_pieces(int piece_type) {
-        if (piece_type != 1 && piece_type != 2) return false;
         ArrayList<int[]> died_pieces = find_died_pieces(piece_type);
         if (died_pieces.isEmpty()) return false;
         for (int[] piece : died_pieces)
@@ -126,8 +109,6 @@ public class GO {
 
     /**
      * Check whether a placement is valid.
-     * @param i
-     * @param j
      * @return boolean indicating whether the placement is valid.
      */
     public boolean valid_place_check(int i, int j, int piece_type) {
@@ -156,8 +137,8 @@ public class GO {
         return possible_placements;
     }
 
+    // PRE: piece_type can only be either 1('X') or 2('O')
     public ArrayList<int[]> getStones(int piece_type) {
-        if (piece_type != 1 && piece_type != 2) return null;
         ArrayList<int[]> stones = new ArrayList<>();
         for (int i = 0; i < board.length; i++)
             for (int j = 0; j < board[0].length; j++)
@@ -169,7 +150,6 @@ public class GO {
     /**
      * Get final score of a player by counting the number of stones and komi
      * @param piece_type 1('X') or 2('O')
-     * @return
      */
     public double getScore(int piece_type) {
         if (piece_type != 1 && piece_type != 2) return 0;
@@ -182,9 +162,6 @@ public class GO {
 
     /**
      * Calculate the liberty of a given place.
-     * @param i
-     * @param j
-     * @return
      */
     public int getLiberty(int i, int j) {
         return (int)getLiberty(i, j, 1);
@@ -206,8 +183,7 @@ public class GO {
 
     /**
      * Calculate the liberties of a given player with duplicate.
-     * @param piece_type
-     * @return
+     * @param piece_type 1('X') or 2('O')
      */
     public int getLiberties(int piece_type){
         return (int)getLiberties(piece_type, 1);
@@ -219,23 +195,7 @@ public class GO {
         return count;
     }
 
-    /**
-     * Calculate the liberties of a given player without duplicate.
-     * @param piece_type
-     * @return
-     */
-    public int getLiberty_2(int piece_type) {
-        Set<ArrayList<Integer>> liberties = new HashSet<>();
-        for (int[] piece : getStones(piece_type))
-            for (int[] neighbor : detect_neighbor(piece[0], piece[1]))
-                if (board[neighbor[0]][neighbor[1]] == 0) {
-                    ArrayList<Integer> liberty = new ArrayList<>();
-                    liberty.add(neighbor[0]); liberty.add(neighbor[1]);
-                    liberties.add(liberty);
-                }
-        return liberties.size();
-    }
-
+    // PRE: "board1" and "board2" cannot be null.
     public static boolean compareBoard(int[][] board1, int[][] board2) {
         if (board1.length != board2.length) return false;
         if (board1[0].length != board2[0].length) return false;
@@ -245,8 +205,8 @@ public class GO {
         return true;
     }
 
+    // PRE: "target" cannot be null.
     public static int[][] deepCopy2DArray(int[][] target) {
-        if (target == null) return null;
         int[][] copy = new int[target.length][target[0].length];
         for(int i = 0; i < target.length; i++)
             for(int j = 0; j < target[0].length; j++)

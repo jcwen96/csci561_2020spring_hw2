@@ -21,8 +21,6 @@ public class my_player {
             readInput(in);
             go = new GO(previous_board, board);
             writeOutput(minimax(go.getPossiblePlacements(piece_type)), new PrintStream(new File("output.txt")));
-//            writeOutput(greedy(go.getPossiblePlacements(piece_type)), new PrintStream(new File("output.txt")));
-            System.err.println(step);
         } catch (FileNotFoundException e) {
             System.err.println(e.getMessage());
             System.err.println("The program exit.");
@@ -34,8 +32,7 @@ public class my_player {
         double maxValue = Integer.MIN_VALUE;
         Map<int[], Double> valueMap = new HashMap<>();
         for (int[] place : possible_placements) {
-            GO test_go = new GO(go);
-            test_go.updateBoard(place[0], place[1], piece_type);
+            GO test_go = new GO(go, place[0], place[1], piece_type);
             double curValue = minValue(test_go, 4, step, piece_type, Integer.MIN_VALUE, Integer.MAX_VALUE);
             valueMap.put(place, curValue);
             maxValue = curValue > maxValue ? curValue : maxValue;
@@ -48,10 +45,11 @@ public class my_player {
 
     private static double maxValue(GO go, int depth, int step, int piece_type, double a, double b) {
         if (depth < 1 || step > maxStep - 1) return evaluation(go);
+        ArrayList<int[]> possible_placements = go.getPossiblePlacements(3 - piece_type);
+        if (possible_placements.isEmpty()) return evaluation(go);
         double value = Integer.MIN_VALUE;
-        for (int[] place : go.getPossiblePlacements(3 - piece_type)) {
-            GO test_go = new GO(go);
-            test_go.updateBoard(place[0], place[1], 3 - piece_type);
+        for (int[] place : possible_placements) {
+            GO test_go = new GO(go, place[0], place[1], 3 - piece_type);
             double curValue = minValue(test_go, depth - 1, step + 1, 3 - piece_type, a, b);
             value = curValue > value ? curValue : value;
             if (value >= b) return value;
@@ -62,10 +60,11 @@ public class my_player {
 
     private static double minValue(GO go, int depth, int step, int piece_type, double a, double b) {
         if (depth < 1 || step > maxStep - 1) return evaluation(go);
+        ArrayList<int[]> possible_placements = go.getPossiblePlacements(3 - piece_type);
+        if (possible_placements.isEmpty()) return evaluation(go);
         double value = Integer.MAX_VALUE;
-        for (int[] place : go.getPossiblePlacements(3 - piece_type)) {
-            GO test_go = new GO(go);
-            test_go.updateBoard(place[0], place[1], 3 - piece_type);
+        for (int[] place : possible_placements) {
+            GO test_go = new GO(go, place[0], place[1], 3 - piece_type);
             double curValue = maxValue(test_go, depth - 1, step + 1, 3 - piece_type, a, b);
             value = curValue < value ? curValue : value;
             if (value <= a) return value;
@@ -79,8 +78,7 @@ public class my_player {
         double maxEvaluation = Integer.MIN_VALUE;
         Map<int[], Double> valueMap = new HashMap<>();
         for (int[] place : possible_placements) {
-            GO test_go = new GO(board, board);
-            test_go.updateBoard(place[0], place[1], piece_type);
+            GO test_go = new GO(go, place[0], place[1], piece_type);
             double curEvaluation = evaluation(test_go);
             valueMap.put(place, curEvaluation);
             maxEvaluation = curEvaluation > maxEvaluation ? curEvaluation : maxEvaluation;
@@ -134,10 +132,7 @@ public class my_player {
     }
 
     private static void writeOutput(int[] result, PrintStream out) {
-        if (result == null) {
-            out.println("PASS");
-            return;
-        }
-        out.println(result[0] + "," + result[1]);
+        if (result == null) out.println("PASS");
+        else out.println(result[0] + "," + result[1]);
     }
 }
