@@ -20,8 +20,11 @@ public class GO {
 
     public boolean isWorth(int i, int j) {
         if (board[i][j] == 0){
-            for (int[] neighbor : detect_neighbor2(i, j))
+            for (int[] neighbor : detect_neighbor(i, j))
                 if (board[neighbor[0]][neighbor[1]] != 0)
+                    return true;
+            for (int[] diagonal : detect_diagonal(i, j))
+                if (board[diagonal[0]][diagonal[1]] != 0)
                     return true;
             return false;
         }
@@ -50,17 +53,13 @@ public class GO {
         if (j < board[0].length - 1) neighbors.add(new int[] {i, j+1});
         return neighbors;
     }
-    public ArrayList<int[]> detect_neighbor2(int i, int j) {
-        ArrayList<int[]> neighbors = new ArrayList<>();
-        if (i > 0 && j > 0) neighbors.add(new int[] {i-1, j-1});
-        if (i > 0) neighbors.add(new int[] {i-1, j});
-        if (i > 0 && j < board.length - 1) neighbors.add(new int[] {i-1, j+1});
-        if (j < board[0].length - 1) neighbors.add(new int[] {i, j+1});
-        if (i < board.length - 1 && j < board.length - 1) neighbors.add(new int[] {i+1, j+1});
-        if (i < board.length - 1) neighbors.add(new int[] {i+1, j});
-        if (i < board.length - 1 && j > 0) neighbors.add(new int[] {i+1, j-1});
-        if (j > 0) neighbors.add(new int[] {i, j-1});
-        return neighbors;
+    public ArrayList<int[]> detect_diagonal(int i, int j) {
+        ArrayList<int[]> diagonal = new ArrayList<>();
+        if (i > 0 && j > 0) diagonal.add(new int[] {i-1, j-1});
+        if (i > 0 && j < board.length - 1) diagonal.add(new int[] {i-1, j+1});
+        if (i < board.length - 1 && j < board.length - 1) diagonal.add(new int[] {i+1, j+1});
+        if (i < board.length - 1 && j > 0) diagonal.add(new int[] {i+1, j-1});
+        return diagonal;
     }
 
     /**
@@ -191,23 +190,16 @@ public class GO {
                     count += factor * getLiberty(neighbor[0], neighbor[1], depth - 1);
             depth--;
         }
-        for (int[] neighbor : detect_neighbor(i, j))
-            if (board[neighbor[0]][neighbor[1]] == 0)
-                count += 1;
+        for (int[] neighbor : detect_neighbor(i, j)) {
+            if (board[neighbor[0]][neighbor[1]] == 0) count += 1;
+        }
         return count;
     }
 
-    /**
-     * Calculate the liberties of a given player with duplicate.
-     * @param piece_type 1('X') or 2('O')
-     */
-    public int getLiberties(int piece_type){
-        return (int)getLiberties(piece_type, 1);
-    }
-    public double getLiberties(int piece_type, int depth) {
-        double count = 0;
-        for (int[] piece : getStones(piece_type))
-            count += getLiberty(piece[0], piece[1], depth);
+    public int getDefence(int i, int j) {
+        int count = 0;
+        for (int[] diagonal : detect_diagonal(i, j))
+            if (board[diagonal[0]][diagonal[1]] == board[i][j]) count += 1;
         return count;
     }
 
