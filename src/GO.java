@@ -2,9 +2,8 @@ import java.util.ArrayList;
 
 public class GO {
 
-    private int[][] previous_board;
-    private int[][] board;
-    private int[] freshStone;
+    protected int[][] previous_board;
+    protected int[][] board;
 
     public GO(int[][] previous_board, int[][] board) {
         this.previous_board = deepCopy2DArray(previous_board);
@@ -17,21 +16,26 @@ public class GO {
         this.previous_board = deepCopy2DArray(board);
         board[i][j] = piece_type;
         remove_died_pieces(3 - piece_type);
-        freshStone = new int[] {i, j, piece_type};
     }
 
-    public int[] getFreshStone() {
-        if (freshStone == null) return null;
-        return freshStone;
-    }
-
-    public double getSafety(int i, int j, int piece_type) {
-        double safety = 0;
-        for (int[] neighbor : detect_neighbor(i, j)){
-            if (board[neighbor[0]][neighbor[1]] == 0) safety += 1;
-            if (board[neighbor[0]][neighbor[1]] == piece_type) safety += 0.5;
+    public boolean isWorth(int i, int j) {
+        if (board[i][j] == 0){
+            for (int[] neighbor : detect_neighbor2(i, j))
+                if (board[neighbor[0]][neighbor[1]] != 0)
+                    return true;
+            return false;
         }
-        return safety;
+        return false;
+    }
+
+    public ArrayList<int[]> getWorthPlacements(int piece_type) {
+        ArrayList<int[]> worth_placements = new ArrayList<>();
+        for (int i = 0; i < board.length; i++)
+            for (int j = 0; j < board[0].length; j++)
+                if (isWorth(i, j))
+                    if (valid_place_check(i, j, piece_type))
+                        worth_placements.add(new int[]{i, j});
+        return worth_placements;
     }
 
     /**
@@ -44,6 +48,18 @@ public class GO {
         if (i < board.length - 1) neighbors.add(new int[] {i+1, j});
         if (j > 0) neighbors.add(new int[] {i, j-1});
         if (j < board[0].length - 1) neighbors.add(new int[] {i, j+1});
+        return neighbors;
+    }
+    public ArrayList<int[]> detect_neighbor2(int i, int j) {
+        ArrayList<int[]> neighbors = new ArrayList<>();
+        if (i > 0 && j > 0) neighbors.add(new int[] {i-1, j-1});
+        if (i > 0) neighbors.add(new int[] {i-1, j});
+        if (i > 0 && j < board.length - 1) neighbors.add(new int[] {i-1, j+1});
+        if (j < board[0].length - 1) neighbors.add(new int[] {i, j+1});
+        if (i < board.length - 1 && j < board.length - 1) neighbors.add(new int[] {i+1, j+1});
+        if (i < board.length - 1) neighbors.add(new int[] {i+1, j});
+        if (i < board.length - 1 && j > 0) neighbors.add(new int[] {i+1, j-1});
+        if (j > 0) neighbors.add(new int[] {i, j-1});
         return neighbors;
     }
 
